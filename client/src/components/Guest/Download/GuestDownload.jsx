@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
+import { API_BASE_URL } from "../../../config/axiosInstance";
 
 const GuestDownload = () => {
   const { shortCode } = useParams();
@@ -16,7 +17,7 @@ const GuestDownload = () => {
 
   const fetchFile = async () => {
     try {
-      const res = await fetch(`http://localhost:6600/api/files/g/${shortCode}`, {
+      const res = await fetch(`${API_BASE_URL}files/g/${shortCode}`, {
         signal: controller.signal,
       });
 
@@ -64,7 +65,7 @@ const GuestDownload = () => {
     }
 
     try {
-      const res = await fetch(`http://localhost:6600/api/files/verifyGuestFilePassword`, {
+      const res = await fetch(`${API_BASE_URL}files/verifyGuestFilePassword`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ shortCode, password }),

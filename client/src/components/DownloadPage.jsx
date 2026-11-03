@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
+import { API_BASE_URL } from "../config/axiosInstance";
 
 const DownloadPage = () => {
   const { shortCode } = useParams();
@@ -12,7 +13,7 @@ const DownloadPage = () => {
   const [isVerified, setIsVerified] = useState(false);
 
   // useEffect(() => {
-  //   fetch(`http://localhost:6600/api/files/f/${shortCode}`)
+  //   fetch(`${API_BASE_URL}files/f/${shortCode}`)
   //     .then((res) => {
   //       if (!res.ok) throw new Error("File not found");
   //       return res.json();
@@ -33,7 +34,7 @@ const DownloadPage = () => {
 
   const fetchFile = async () => {
     try {
-      const res = await fetch(`http://localhost:6600/api/files/f/${shortCode}`, {
+      const res = await fetch(`${API_BASE_URL}files/f/${shortCode}`, {
         signal: controller.signal,
       });
 
@@ -80,7 +81,7 @@ const DownloadPage = () => {
     }
 
     try {
-      const res = await fetch(`http://localhost:6600/api/files/verifyFilePassword`, {
+      const res = await fetch(`${API_BASE_URL}files/verifyFilePassword`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ shortCode, password }),
