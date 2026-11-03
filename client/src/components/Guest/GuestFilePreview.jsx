@@ -11,6 +11,7 @@ import {
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { Link } from "react-router-dom";
+import axiosInstance from "../../config/axiosInstance";
 import { FaEye, FaShare, FaTrashAlt } from "react-icons/fa";
 
 const GuestFilePreview = ({ guestFiles }) => {
@@ -18,6 +19,30 @@ const GuestFilePreview = ({ guestFiles }) => {
   const [files, setFiles] = useState(guestFiles || []);
   const [previewFile, setPreviewFile] = useState(null);
   const [shareFile, setShareFile] = useState(null);
+  const handlePreview = async (file) => {
+    if (file.path && file.path.includes("X-Amz-Signature")) {
+      setPreviewFile(file);
+      return;
+    }
+    if (file.shortUrl) {
+      try {
+        const res = await axiosInstance.get(`/files${file.shortUrl}`);
+        if (res.data && (res.data.downloadUrl || res.data.path)) {
+          const freshUrl = res.data.downloadUrl || res.data.path;
+          setPreviewFile({
+            ...file,
+            path: freshUrl,
+            downloadUrl: freshUrl
+          });
+          return;
+        }
+      } catch (err) {
+        console.warn("Could not refresh preview URL:", err);
+      }
+    }
+    setPreviewFile(file);
+  };
+
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
@@ -258,7 +283,7 @@ const GuestFilePreview = ({ guestFiles }) => {
                           </td>
                           <td className="px-6 py-4 flex gap-2 mt-2 text-sm space-x-3">
                             <button
-                              onClick={() => setPreviewFile(file)}
+                              onClick={() => handlePreview(file)}
                               className="flex items-center gap-1 px-3 py-1 text-sm text-blue-600 border border-blue-500 rounded hover:bg-blue-50 transition"
                             >
                               <FaEye /> Preview
@@ -351,7 +376,7 @@ const GuestFilePreview = ({ guestFiles }) => {
 
                             <div className="flex flex-wrap gap-4 mt-3">
                              <button
-                              onClick={() => setPreviewFile(file)}
+                              onClick={() => handlePreview(file)}
                               className="flex items-center gap-1 px-3 py-1 text-sm text-blue-600 border border-blue-500 rounded hover:bg-blue-50 transition"
                             >
                               <FaEye /> Preview
@@ -431,43 +456,85 @@ const GuestFilePreview = ({ guestFiles }) => {
 
       {/* Preview Modal */}
       {previewFile && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded shadow-lg max-w-2xl w-full">
-            <h3 className="text-lg font-bold mb-2">{previewFile.name}</h3>
-            {/* File Preview */}
-            {previewFile.type.startsWith("image/") && (
-              <img
-                src={previewFile.path}
-                alt={previewFile.name}
-                className="w-full h-auto rounded mb-4"
-              />
-            )}
-            {previewFile.type.startsWith("video/") && (
-              <video controls className="w-full h-auto rounded mb-4">
-                <source src={previewFile.path} type={previewFile.type} />
-                Your browser does not support the video tag.
-              </video>
-            )}
-            {previewFile.type.startsWith("audio/") && (
-              <audio controls className="w-full h-auto rounded mb-4">
-                <source src={previewFile.path} type={previewFile.type} />
-                Your browser does not support the audio element.
-              </audio>
-            )}
-            {previewFile.type === "application/pdf" && (
-              <iframe
-                src={previewFile.path}
-                title="PDF Preview"
-                className="w-full h-[400px] rounded mb-4"
-              ></iframe>
-            )}
-            <div className="mt-4 text-right">
+        <div
+          className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4"
+          onClick={() => setPreviewFile(null)}
+        >
+          <div
+            className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-gray-200 dark:border-gray-800"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 truncate pr-4">
+                {previewFile.name}
+              </h3>
               <button
                 onClick={() => setPreviewFile(null)}
-                className="px-4 py-2 text-white bg-red-600 rounded hover:bg-red-700"
+                className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+                title="Close"
               >
-                Close
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
+            </div>
+
+            {/* Modal Content - Centered & Height-Constrained */}
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-gray-50/70 dark:bg-gray-950/40 min-h-[220px]">
+              {previewFile.type.startsWith("image/") && (
+                <img
+                  src={previewFile.downloadUrl || previewFile.path}
+                  alt={previewFile.name}
+                  className="max-h-[65vh] w-auto max-w-full object-contain rounded-lg shadow-sm"
+                />
+              )}
+              {previewFile.type.startsWith("video/") && (
+                <video controls className="max-h-[65vh] w-auto max-w-full rounded-lg shadow-sm">
+                  <source src={previewFile.downloadUrl || previewFile.path} type={previewFile.type} />
+                  Your browser does not support the video tag.
+                </video>
+              )}
+              {previewFile.type.startsWith("audio/") && (
+                <div className="w-full max-w-md p-6 bg-white dark:bg-gray-900 rounded-xl shadow-sm text-center">
+                  <p className="text-sm font-medium mb-3 text-gray-600 dark:text-gray-300">Audio Preview</p>
+                  <audio controls className="w-full">
+                    <source src={previewFile.downloadUrl || previewFile.path} type={previewFile.type} />
+                    Your browser does not support the audio element.
+                  </audio>
+                </div>
+              )}
+              {previewFile.type === "application/pdf" && (
+                <iframe
+                  src={previewFile.downloadUrl || previewFile.path}
+                  title="PDF Preview"
+                  className="w-full h-[65vh] rounded-lg border border-gray-200 dark:border-gray-800"
+                ></iframe>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+              <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                Size: {(previewFile.size / 1024).toFixed(1)} KB
+              </span>
+              <div className="flex items-center gap-2">
+                {previewFile.downloadUrl && (
+                  <a
+                    href={previewFile.downloadUrl}
+                    download={previewFile.name}
+                    className="px-4 py-1.5 text-xs sm:text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition"
+                  >
+                    Download
+                  </a>
+                )}
+                <button
+                  onClick={() => setPreviewFile(null)}
+                  className="px-4 py-1.5 text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-lg transition"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -475,8 +542,14 @@ const GuestFilePreview = ({ guestFiles }) => {
 
       {/* Share Modal */}
       {shareFile && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-[--bg-color] p-6 rounded shadow-lg w-full max-w-md md:max-w-2xl">
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setShareFile(null)}
+        >
+          <div
+            className="bg-white dark:bg-[--bg-color] p-6 rounded-xl shadow-2xl w-full max-w-md md:max-w-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className="text-lg font-bold mb-4 text-center">
               Share "{shareFile?.name}"
             </h3>

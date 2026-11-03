@@ -128,22 +128,22 @@ const DownloadPage = () => {
   ) : (
     <>
       {file.type.startsWith("image/") && (
-        <img src={file.path} alt={file.name} className="w-full h-auto rounded mb-4" />
+        <img src={file.downloadUrl || file.path} alt={file.name} className="w-full h-auto rounded mb-4" />
       )}
       {file.type.startsWith("video/") && (
         <video controls className="w-full h-auto rounded mb-4">
-          <source src={file.path} type={file.type} />
+          <source src={file.downloadUrl || file.path} type={file.type} />
           Your browser does not support the video tag.
         </video>
       )}
       {file.type.startsWith("audio/") && (
         <audio controls className="w-full h-auto rounded mb-4">
-          <source src={file.path} type={file.type} />
+          <source src={file.downloadUrl || file.path} type={file.type} />
           Your browser does not support the audio element.
         </audio>
       )}
       {file.type === "application/pdf" && (
-        <iframe src={file.path} title="PDF Preview" className="w-full h-[400px] rounded mb-4"></iframe>
+        <iframe src={file.downloadUrl || file.path} title="PDF Preview" className="w-full h-[400px] rounded mb-4"></iframe>
       )}
     </>
   )}

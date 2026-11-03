@@ -13,6 +13,26 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 
 
+const getPresignedViewUrl = async (fileName) => {
+  try {
+    const s3Client = new S3Client({
+      region: process.env.AWS_REGION,
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+      }
+    });
+    const command = new GetObjectCommand({
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: `file-share-app/${fileName}`,
+    });
+    return await getSignedUrl(s3Client, command, { expiresIn: 7 * 24 * 60 * 60 });
+  } catch (err) {
+    console.error("Presign error for", fileName, err);
+    return null;
+  }
+};
+
 const uploadFiles = async (req, res) => {
   if (!req.files || req.files.length === 0) {
     return res.status(400).json({ error: 'No files uploaded' });
@@ -48,22 +68,30 @@ const uploadFiles = async (req, res) => {
       const fileUrl = s3Result.Location;
       const shortCode = shortid.generate();
 
+      // Safe expiration date parsing
+      let expiryDateObj = null;
+      if (hasExpiry === 'true') {
+        const parsedHours = Number(expiresAt);
+        const hours = (!isNaN(parsedHours) && parsedHours > 0) ? parsedHours : 240;
+        expiryDateObj = new Date(Date.now() + hours * 3600000);
+      } else {
+        expiryDateObj = new Date(Date.now() + 10 * 24 * 3600000);
+      }
+
       const fileObj = {
         path: fileUrl,
         name: finalFileName,
         type: file.mimetype,
         size: file.size,
         hasExpiry: hasExpiry === 'true',
-        expiresAt: hasExpiry === 'true'
-          ? new Date(Date.now() + expiresAt * 3600000)
-          : new Date(Date.now() + 10 * 24 * 3600000),
+        expiresAt: expiryDateObj,
         status: 'active',
         shortUrl: `/f/${shortCode}`,
         createdBy: userId,
       };
 
-      if (isPassword === 'true') {
-        const hashedPassword = await bcrypt.hash(password, 10);
+      if (isPassword === 'true' && password && String(password).trim().length > 0) {
+        const hashedPassword = await bcrypt.hash(String(password).trim(), 10);
         fileObj.password = hashedPassword;
         fileObj.isPasswordProtected = true;
       }
@@ -72,109 +100,142 @@ const uploadFiles = async (req, res) => {
       const savedFile = await newFile.save();
       savedFiles.push(savedFile);
 
-      // Update user stats
-      user.totalUploads += 1;
-      if (file.mimetype.startsWith('image/')) user.imageCount += 1;
-      else if (file.mimetype.startsWith('video/')) user.videoCount += 1;
-      else if (file.mimetype.startsWith('application/')) user.documentCount += 1;
+      // Update user stats safely
+      user.totalUploads = (user.totalUploads || 0) + 1;
+      if (file.mimetype.startsWith('image/')) user.imageCount = (user.imageCount || 0) + 1;
+      else if (file.mimetype.startsWith('video/')) user.videoCount = (user.videoCount || 0) + 1;
+      else if (file.mimetype.startsWith('application/')) user.documentCount = (user.documentCount || 0) + 1;
     }
 
     await user.save();
 
+    const filesWithUrls = await Promise.all(savedFiles.map(async f => {
+      const signedUrl = await getPresignedViewUrl(f.name);
+      return {
+        id: f._id,
+        name: f.name,
+        size: f.size,
+        type: f.type,
+        path: signedUrl || f.path,
+        downloadUrl: signedUrl || f.path,
+        rawPath: f.path,
+        isPasswordProtected: f.isPasswordProtected,
+        expiresAt: f.expiresAt,
+        downloadedContent: f.downloadedContent,
+        status: f.status,
+        shortUrl: f.shortUrl,
+        createdAt: f.createdAt,
+        updatedAt: f.updatedAt
+      };
+    }));
+
     return res.status(201).json({
       message: "Files uploaded successfully",
       fileIds: savedFiles.map(f => f._id),
+      files: filesWithUrls
     });
   } catch (error) {
     console.error("Upload error:", error);
-    res.status(500).json({ message: "File upload failed" });
+    res.status(500).json({ message: error.message || "File upload failed" });
   }
 };
 
 const uploadFilesGuest = async (req, res) => {
-      if(!req.files || req.files.length === 0){
-        return res.status(400).json({ error: 'No files uploaded' });
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ error: 'No files uploaded' });
+  }
+
+  const { isPassword, password, hasExpiry, expiresAt } = req.body;
+
+  try {
+    const s3 = new AWS.S3({
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      region: process.env.AWS_REGION
+    });
+
+    const savedFiles = [];
+
+    for (const file of req.files) {
+      const originalName = file.originalname;
+      const extension = path.extname(originalName);
+      const uniqueSuffix = shortid.generate();
+      const finalFileName = `${originalName.replace(/\s+/g, '_')}_${uniqueSuffix}${extension}`;
+
+      const params = {
+        Bucket: process.env.AWS_BUCKET_NAME,
+        Key: `file-share-app/${finalFileName}`,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      };
+
+      const s3Result = await s3.upload(params).promise();
+      const fileUrl = s3Result.Location;
+      const shortCode = shortid.generate();
+      const username = shortid.generate();
+
+      // Safe expiration date parsing
+      let expiryDateObj = null;
+      if (hasExpiry === 'true') {
+        const parsedHours = Number(expiresAt);
+        const hours = (!isNaN(parsedHours) && parsedHours > 0) ? parsedHours : 240;
+        expiryDateObj = new Date(Date.now() + hours * 3600000);
+      } else {
+        expiryDateObj = new Date(Date.now() + 10 * 24 * 3600000);
       }
 
-      const {isPassword,password,hasExpiry,expiresAt} = req.body;
+      const fileObj = {
+        path: fileUrl,
+        name: finalFileName,
+        type: file.mimetype,
+        size: file.size,
+        hasExpiry: hasExpiry === 'true',
+        expiresAt: expiryDateObj,
+        status: 'active',
+        shortUrl: `/g/${shortCode}`,
+        createdBy: `guest_${username}`,
+      };
 
-      try {
-           const s3 = new AWS.S3({
-             accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-             secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-             region: process.env.AWS_REGION
-           });
+      if (isPassword === 'true' && password && String(password).trim().length > 0) {
+        const hashedPassword = await bcrypt.hash(String(password).trim(), 10);
+        fileObj.password = hashedPassword;
+        fileObj.isPasswordProtected = true;
+      }
 
-            const savedFiles = [];
+      const newFile = new GuestFile(fileObj);
+      const savedFile = await newFile.save();
+      savedFiles.push(savedFile);
+    }
 
+    const filesWithUrls = await Promise.all(savedFiles.map(async f => {
+      const signedUrl = await getPresignedViewUrl(f.name);
+      return {
+        id: f._id,
+        name: f.name,
+        size: f.size,
+        type: f.type,
+        path: signedUrl || f.path,
+        downloadUrl: signedUrl || f.path,
+        rawPath: f.path,
+        isPasswordProtected: f.isPasswordProtected,
+        expiresAt: f.expiresAt,
+        downloadedContent: f.downloadedContent,
+        status: f.status,
+        shortUrl: f.shortUrl,
+        createdAt: f.createdAt,
+        updatedAt: f.updatedAt
+      };
+    }));
 
-            for(const file of req.files){
-              const originalName = file.originalname;
-              const extension = path.extname(originalName);
-              const uniqueSuffix = shortid.generate();
-              const finalFileName = `${originalName.replace(/\s+/g, '_')}_${uniqueSuffix}${extension}`;
-
-              const params = {
-                Bucket: process.env.AWS_BUCKET_NAME,
-                Key: `file-share-app/${finalFileName}`,
-                Body: file.buffer,
-                ContentType: file.mimetype,
-              };
-
-              const s3Result = await s3.upload(params).promise();
-              const fileUrl = s3Result.Location;
-              const shortCode = shortid.generate();
-
-              const username = shortid.generate();
-
-              const fileObj = {
-                path: fileUrl,
-                name: finalFileName,
-                type: file.mimetype,
-                size: file.size,
-                hasExpiry: hasExpiry === 'true',
-                expiresAt: hasExpiry === 'true'
-                  ? new Date(Date.now() + expiresAt * 3600000)
-                  : new Date(Date.now() + 10 * 24 * 3600000),
-                status: 'active',
-                shortUrl: `/g/${shortCode}`,
-                createdBy: `guest_${username}`,
-              };
-
-              if (isPassword === 'true') {
-                const hashedPassword = await bcrypt.hash(password, 10);
-                fileObj.password = hashedPassword;
-                fileObj.isPasswordProtected = true;
-              }
-
-              const newFile = new GuestFile(fileObj);
-              const savedFile = await newFile.save();
-              savedFiles.push(savedFile);
-            }
-
-
-            return res.status(201).json({
-              message: "Files uploaded successfully",
-              files: savedFiles.map(f => ({
-                id: f._id,
-                name: f.name,
-                size: f.size,
-                type: f.type,
-                path: f.path,
-                isPasswordProtected: f.isPasswordProtected,
-                expiresAt: f.expiresAt,
-                downloadedContent: f.downloadedContent,
-                status: f.status,
-                shortUrl: f.shortUrl,
-                createdAt: f.createdAt,
-                updatedAt: f.updatedAt
-              }))
-            });
-          } catch (error) {
-            console.error("Upload error:", error);
-            res.status(500).json({ message: "File upload failed" });
-          }
-        };
+    return res.status(201).json({
+      message: "Files uploaded successfully",
+      files: filesWithUrls
+    });
+  } catch (error) {
+    console.error("Upload error:", error);
+    res.status(500).json({ message: error.message || "File upload failed" });
+  }
+};
 
 
 const downloadInfo = async (req, res) => {
@@ -227,7 +288,8 @@ const downloadInfo = async (req, res) => {
       name: file.name,
       size: file.size,
       type: file.type || 'file',
-      path: file.path,
+      path: downloadUrl,
+      rawPath: file.path,
       isPasswordProtected: file.isPasswordProtected || false,
       expiresAt: file.expiresAt || null,
       status: file.status || 'active',
@@ -286,7 +348,8 @@ const guestDownloadInfo = async (req, res) => {
       name: file.name,
       size: file.size,
       type: file.type || 'file',
-      path: file.path,
+      path: downloadUrl,
+      rawPath: file.path,
       isPasswordProtected: file.isPasswordProtected || false,
       expiresAt: file.expiresAt || null,
       status: file.status || 'active',
@@ -527,11 +590,7 @@ const searchFiles = async (req, res) => {
       name: { $regex: query, $options: 'i' }, // Case-insensitive search
     });
 
-    if (!files.length) {
-      return res.status(404).json({ message: 'No files found' });
-    }
-
-    return res.status(200).json(files);
+    return res.status(200).json(files || []);
 
   } catch (error) {
     console.error("Search error:", error);
@@ -674,11 +733,22 @@ const getDownloadCount = async (req, res) => {
 
 const resolveShareLink = async (req, res) => {
   const { code } = req.params;
-const shortUrl = `${process.env.BASE_URL}/f/${code}`;
-const file = await File.findOne({ shortUrl });
-
   try {
-    const file = await File.findOne({ shortUrl });
+    let file = await File.findOne({
+      $or: [
+        { shortUrl: `/f/${code}` },
+        { shortUrl: `${process.env.BASE_URL}/f/${code}` }
+      ]
+    });
+
+    if (!file) {
+      file = await GuestFile.findOne({
+        $or: [
+          { shortUrl: `/g/${code}` },
+          { shortUrl: `${process.env.BASE_URL}/g/${code}` }
+        ]
+      });
+    }
 
     if (!file) {
       return res.status(404).json({ error: "Invalid or expired link" });
@@ -695,7 +765,7 @@ const file = await File.findOne({ shortUrl });
       fileId: file._id,
       name: file.name,
       size: file.size,
-      type: file.type || "file", // fallback if missing
+      type: file.type || "file",
       previewUrl: file.path,
       isPasswordProtected: file.isPasswordProtected || false,
       expiresAt: file.expiresAt || null,
@@ -743,22 +813,24 @@ const verifyGuestFilePassword = async (req, res) => {
 }
 
 const getUserFiles = async (req, res) => {
-
   const { userId } = req.params;
   try {
-    const files = await File.find({ createdBy: userId });
-
-    if (!files.length) {
-      return res.status(404).json({ message: 'No files found' });
-    }
-
-    return res.status(200).json(files);
-
+    const files = await File.find({ createdBy: userId }).sort({ createdAt: -1 });
+    const filesWithUrls = await Promise.all(files.map(async f => {
+      const signedUrl = await getPresignedViewUrl(f.name);
+      return {
+        ...f.toObject(),
+        path: signedUrl || f.path,
+        downloadUrl: signedUrl || f.path,
+        rawPath: f.path
+      };
+    }));
+    return res.status(200).json(filesWithUrls || []);
   } catch (error) {
     console.error("List files error:", error);
     return res.status(500).json({ error: "Error fetching user files" });
   }
-}
+};
 
 
 

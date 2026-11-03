@@ -10,7 +10,7 @@ const GuestFileUpload = ({guestFiles, updateFiles}) => {
   const dispatch = useDispatch();
   const [loading ,setLoading] = useState(false);
 
-  const [files, setFiles] = useState(guestFiles || []);
+  const [files, setFiles] = useState([]);
   const [enablePassword, setEnablePassword] = useState(false);
   const [password, setPassword] = useState("");
   const [enableExpiry, setEnableExpiry] = useState(false);
@@ -63,20 +63,32 @@ const GuestFileUpload = ({guestFiles, updateFiles}) => {
       return;
     }
 
+    if (enableExpiry && !expiryDate) {
+      toast.warning("Please select an expiration date or disable expiry.");
+      setLoading(false);
+      return;
+    }
+
+    if (enablePassword && (!password || password.trim() === "")) {
+      toast.warning("Please enter a password or disable password protection.");
+      setLoading(false);
+      return;
+    }
+
     const formData = new FormData();
     files.forEach((file) => formData.append("files", file));
     formData.append("hasExpiry", enableExpiry);
 
     if (enableExpiry && expiryDate) {
-      const hours = Math.ceil(
+      const hours = Math.max(1, Math.ceil(
         (new Date(expiryDate) - new Date()) / (1000 * 60 * 60)
-      );
+      ));
       formData.append("expiresAt", hours);
     }
 
     formData.append("isPassword", enablePassword);
     if (enablePassword && password) {
-      formData.append("password", password);
+      formData.append("password", password.trim());
     }
 
     try {
@@ -84,19 +96,18 @@ const GuestFileUpload = ({guestFiles, updateFiles}) => {
         "/files/upload-guest",
         formData
       );
-      console.log("Files uploaded:", response);
-      if (response.data.message || response.data.message === "Files uploaded successfully!") {
+      if (response.data.message) {
         toast.success("Files uploaded successfully!");
-        const newFiles = response.data.files;
-        const updatedFiles = [...guestFiles, ...newFiles];
+        const newFiles = response.data.files || [];
+        const updatedFiles = [...(guestFiles || []), ...newFiles];
 
-        updateFiles(updatedFiles); // ✅ directly update parent state and localStorage
+        updateFiles(updatedFiles);
         setFiles([]);
         setLoading(false);
-        // window.location.reload();
       }
     } catch (err) {
-      toast.error(err?.error || "Upload failed");
+      const msg = err.response?.data?.message || err.response?.data?.error || err.message || "Upload failed";
+      toast.error(msg);
       setLoading(false);
     }
   };

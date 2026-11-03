@@ -13,11 +13,11 @@ import { File } from "./models/file.models.js";
 
 dotenv.config();
 
-const PORT=process.env.PORT || 5600;
+const PORT = process.env.PORT || 5600;
 
-      
+
 const startServer = async () => {
-     try {
+  try {
     await connectDB();
 
     // Register routes
@@ -26,7 +26,7 @@ const startServer = async () => {
 
     app.use(express.static(path.join(__dirname, '/client')));
 
-app.get('/f/:shortCode', async (req, res) => {
+    app.get('/f/:shortCode', async (req, res) => {
 
       const { shortCode } = req.params;
       if (!shortCode) {
@@ -35,18 +35,23 @@ app.get('/f/:shortCode', async (req, res) => {
       console.log("Short code:", shortCode);
       // Handle the download logic here
       try {
-         const file=await File.findOne({ shortUrl: `${process.env.BASE_URL}/f/${shortCode}` });
-          if (!file) {
-            return res.status(404).send('File not found');
-          }
-          // just return that all file info
-         res.json(file);
+        const file = await File.findOne({
+          $or: [
+            { shortUrl: `/f/${shortCode}` },
+            { shortUrl: `${process.env.BASE_URL}/f/${shortCode}` }
+          ]
+        });
+        if (!file) {
+          return res.status(404).send('File not found');
+        }
+        // just return that all file info
+        res.json(file);
       } catch (error) {
         console.error("Error fetching file:", error);
         res.status(500).send('Internal Server Error');
       }
 
-});
+    });
 
     app.listen(PORT, () => {
       console.log(`✅ Server is running at http://localhost:${PORT}`);
@@ -54,6 +59,6 @@ app.get('/f/:shortCode', async (req, res) => {
   } catch (error) {
     console.error("❌ Error starting server:", error);
   }
-  };
-  
-  startServer();
+};
+
+startServer();

@@ -4,13 +4,13 @@ function Footer() {
   return (
     <footer className="w-full border-t border-gray-300 shadow-inner bg-[var(--bg-color)] text-[var(--text-color)] py-6 px-4 flex flex-col md:flex-row items-center justify-between">
       <p className="text-center text-sm font-medium">
-        Crafted with ❤️ by <span className="font-semibold">Prince Kumar</span>
+        Crafted with ❤️ by <span className="font-semibold">Adarsh Kumar</span>
       </p>
 
       <div className="flex items-center gap-4 mt-4 md:mt-0">
         {/* LinkedIn */}
         <a
-          href="https://www.linkedin.com/in/prince-kumar-788673253/"
+          href="https://www.linkedin.com/in/adarshkusingh/"
           target="_blank"
           rel="noopener noreferrer"
           className="hover:scale-110 transition-transform"
@@ -24,7 +24,7 @@ function Footer() {
 
         {/* GitHub */}
         <a
-          href="https://github.com/princeInScripts"
+          href="https://github.com/Adarshkumar76"
           target="_blank"
           rel="noopener noreferrer"
           className="hover:scale-110 transition-transform"
@@ -38,7 +38,7 @@ function Footer() {
 
         {/* Instagram */}
         <a
-          href="https://instagram.com/scriptxprince"
+          href="https://instagram.com/adarsh_ku_"
           target="_blank"
           rel="noopener noreferrer"
           className="hover:scale-110 transition-transform"
@@ -52,7 +52,7 @@ function Footer() {
 
         {/* Email */}
         <a
-          href="mailto:pk8917912@example.com"
+          href="mailto:adarshk3113@gmail.com"
           className="hover:scale-110 transition-transform"
         >
           <img

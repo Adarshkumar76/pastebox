@@ -61,30 +61,49 @@ const FileUploader = () => {
       return;
     }
 
+    const currentUserId = user?._id || user?.id;
+    if (!currentUserId) {
+      toast.error("User session not found. Please log in again.");
+      return;
+    }
+
+    if (enableExpiry && !expiryDate) {
+      toast.warning("Please choose an expiration date or disable expiry.");
+      return;
+    }
+
+    if (enablePassword && (!password || password.trim() === "")) {
+      toast.warning("Please enter a password or disable password protection.");
+      return;
+    }
+
     const formData = new FormData();
     files.forEach((file) => formData.append("files", file));
-    formData.append("userId", user._id ? user._id : user.id);
+    formData.append("userId", currentUserId);
     formData.append("hasExpiry", enableExpiry);
 
     if (enableExpiry && expiryDate) {
-      const hours = Math.ceil(
+      const hours = Math.max(1, Math.ceil(
         (new Date(expiryDate) - new Date()) / (1000 * 60 * 60)
-      );
+      ));
       formData.append("expiresAt", hours);
     }
 
     formData.append("isPassword", enablePassword);
     if (enablePassword && password) {
-      formData.append("password", password);
+      formData.append("password", password.trim());
     }
 
     try {
       await dispatch(uploadFile(formData)).unwrap();
       toast.success("Files uploaded successfully!");
       setFiles([]);
-      window.location.reload();
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
     } catch (err) {
-      toast.error(err?.error || "Upload failed");
+      const msg = err?.message || err?.error || (typeof err === "string" ? err : "Upload failed");
+      toast.error(msg);
     }
   };
 

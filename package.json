@@ -1,0 +1,11 @@
+{
+  "name": "pastebox-root",
+  "version": "1.0.0",
+  "description": "Root workspace runner for PasteBox",
+  "scripts": {
+    "install:all": "npm --prefix server install && npm --prefix client install",
+    "server": "npm --prefix server start",
+    "client": "npm --prefix client run dev"
+  }
+}
+
