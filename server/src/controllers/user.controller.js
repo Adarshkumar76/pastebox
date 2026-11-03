@@ -69,7 +69,11 @@ const registerUser = async (req, res) => {
 // logoutUser
 const logoutUser = async (req, res) => {
   try {
-    res.clearCookie("token");
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    });
     res.status(200).json({ message: "Logout successful" });
   } catch (error) {
     console.error("Error during logout:", error);
@@ -169,7 +173,7 @@ const loginUser = async (req, res) => {
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "Strict",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 24 * 60 * 60 * 1000, // 1 day
     });
 
@@ -193,7 +197,7 @@ const loginUser = async (req, res) => {
 
 
 const verifyToken = (req, res, next) => {
-  const token = req.headers["authorization"];
+  const token = req.headers["authorization"]?.replace(/^Bearer\s+/i, "") || req.cookies?.token;
   if (!token) {
     return res.status(401).json({ message: "No token provided" });
   }

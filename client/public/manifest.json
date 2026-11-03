@@ -1,0 +1,16 @@
+{
+  "short_name": "PasteBox",
+  "name": "PasteBox - File Sharing & Storage Platform",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#1a202c",
+  "theme_color": "#1a202c",
+  "display": "standalone"
+}
+

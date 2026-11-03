@@ -3,13 +3,16 @@ import { createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import axiosInstance from '../../../config/axiosInstance';
 
+// Basic config
+axios.defaults.withCredentials = true;
+
 // REGISTER
 export const registerUser = createAsyncThunk('auth/register', async (formData, { rejectWithValue }) => {
   try {
     const res = await axiosInstance.post('/users/register', formData);
     return res.data;
   } catch (err) {
-    return rejectWithValue(err.response.data.message || 'Registration failed');
+    return rejectWithValue(err.response?.data?.message || err.message || 'Registration failed');
   }
 });
 
@@ -19,19 +22,17 @@ export const loginUser = createAsyncThunk('auth/login', async (formData, { rejec
     const res = await axiosInstance.post('/users/login', formData);
     return res.data;
   } catch (err) {
-    return rejectWithValue(err.response.data.message || 'Login failed');
+    return rejectWithValue(err.response?.data?.message || err.message || 'Login failed');
   }
 });
-
 
 // updateUser
 export const updateUser = createAsyncThunk('auth/updateUser', async ({ userId, username }, { rejectWithValue }) => {
   try {
- 
-    const res = await axiosInstance.put(`/users/user/${userId}`, {username});
+    const res = await axiosInstance.put(`/users/user/${userId}`, { username });
     return res.data;
   } catch (err) {
-    return rejectWithValue(err.response.data);
+    return rejectWithValue(err.response?.data?.message || err.message || 'Error updating user');
   }
 });
 
@@ -41,25 +42,16 @@ export const deleteUser = createAsyncThunk('auth/deleteUser', async (userId, { r
     await axiosInstance.delete(`/users/user/${userId}`);
     return userId;
   } catch (err) {
-    return rejectWithValue(err.response.data);
+    return rejectWithValue(err.response?.data?.message || err.message || 'Error deleting user');
   }
 });
 
-//getUser
+// getUser
 export const getUser = createAsyncThunk('auth/getUser', async (userId, { rejectWithValue }) => {
   try {
-    console.log(userId);
-    
-    const res = await axiosInstance.get(`users/user/${userId}`);
-    console.log(res);
-    
+    const res = await axiosInstance.get(`/users/user/${userId}`);
     return res.data;
   } catch (err) {
-    return rejectWithValue(err.response.data);
+    return rejectWithValue(err.response?.data?.message || err.message || 'Error getting user details');
   }
 });
-
-
-
-
-

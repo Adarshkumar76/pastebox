@@ -36,7 +36,7 @@ const Login = () => {
       console.log(result);
       
       if (result.error) {
-        toast.error(result.payload);
+        toast.error(result.payload || result.error?.message || "Login failed");
       } else {
         toast.success('Login successful');
         navigate('/dashboard');

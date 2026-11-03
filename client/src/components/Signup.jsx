@@ -34,7 +34,7 @@ const Signup = () => {
       const result = await dispatch(registerUser(formData));
       if (result.error) {
         console.log(result);
-        toast.error(result.payload);
+        toast.error(result.payload || result.error?.message || "Registration failed");
       } else {
         toast.success('Registration successful');
         navigate('/login');
