@@ -20,10 +20,14 @@ const GuestFilePreview = ({ guestFiles }) => {
   const [previewFile, setPreviewFile] = useState(null);
   const [shareFile, setShareFile] = useState(null);
   const handlePreview = async (file) => {
-    if (file.path && file.path.includes("X-Amz-Signature")) {
-      setPreviewFile(file);
+    if (file.expiresAt && new Date(file.expiresAt) <= new Date()) {
+      toast.error("This file has expired and has been permanently purged from storage.");
+      const updatedFiles = files.filter((f) => (f.id !== file.id && f._id !== file.id && f._id !== file._id));
+      setFiles(updatedFiles);
+      localStorage.setItem("guestFiles", JSON.stringify(updatedFiles));
       return;
     }
+
     if (file.shortUrl) {
       try {
         const res = await axiosInstance.get(`/files${file.shortUrl}`);
@@ -37,6 +41,13 @@ const GuestFilePreview = ({ guestFiles }) => {
           return;
         }
       } catch (err) {
+        if (err.response?.status === 410 || err.response?.status === 404) {
+          toast.error("This file has expired or was deleted.");
+          const updatedFiles = files.filter((f) => (f.id !== file.id && f._id !== file.id && f._id !== file._id));
+          setFiles(updatedFiles);
+          localStorage.setItem("guestFiles", JSON.stringify(updatedFiles));
+          return;
+        }
         console.warn("Could not refresh preview URL:", err);
       }
     }
@@ -79,23 +90,29 @@ const GuestFilePreview = ({ guestFiles }) => {
       )}&size=150x150`,
     };
   }
-
-  const deleteFile = (fileId) => {
+  const deleteFile = async (fileId) => {
     if (!fileId) {
       toast.error("File ID is invalid.");
       return;
     }
 
-    const updatedFiles = files.filter((file) => file.id !== fileId);
-
-    setFiles(updatedFiles);
-    localStorage.setItem("guestFiles", JSON.stringify(updatedFiles));
-
-    // Re-sync from localStorage (if that's your source of truth)
-    const refreshedFiles = JSON.parse(localStorage.getItem("guestFiles")) || [];
-    setFiles(refreshedFiles);
-
-    toast.success("File deleted successfully!");
+    try {
+      await axiosInstance.delete(`/files/delete/${fileId}`);
+      const updatedFiles = files.filter((file) => file.id !== fileId && file._id !== fileId);
+      setFiles(updatedFiles);
+      localStorage.setItem("guestFiles", JSON.stringify(updatedFiles));
+      toast.success("File permanently deleted from S3 and database!");
+    } catch (err) {
+      console.error("Delete error:", err);
+      if (err.response?.status === 404) {
+        const updatedFiles = files.filter((file) => file.id !== fileId && file._id !== fileId);
+        setFiles(updatedFiles);
+        localStorage.setItem("guestFiles", JSON.stringify(updatedFiles));
+        toast.info("File already removed from server.");
+      } else {
+        toast.error(err.response?.data?.error || err.response?.data?.message || "Failed to delete file from S3");
+      }
+    }
   };
 
   useEffect(() => {

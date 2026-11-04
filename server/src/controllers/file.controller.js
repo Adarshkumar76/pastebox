@@ -1,3 +1,4 @@
+import { purgeS3Object } from "../services/cleanup.service.js";
 import { File } from '../models/file.models.js';
 import { GuestFile } from '../models/guestFile.models.js';
 import s3 from "../config/s3.js";
@@ -26,7 +27,7 @@ const getPresignedViewUrl = async (fileName) => {
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: `file-share-app/${fileName}`,
     });
-    return await getSignedUrl(s3Client, command, { expiresIn: 7 * 24 * 60 * 60 });
+    return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
   } catch (err) {
     console.error("Presign error for", fileName, err);
     return null;
@@ -454,7 +455,9 @@ const deleteFile = async (req, res) => {
         $or: [
           { name: fileId },
           { shortUrl: `/f/${fileId}` },
-          { shortUrl: `/g/${fileId}` }
+          { shortUrl: `/g/${fileId}` },
+          { shortUrl: `${process.env.BASE_URL}/f/${fileId}` },
+          { shortUrl: `${process.env.BASE_URL}/g/${fileId}` }
         ]
       });
     }
@@ -463,7 +466,9 @@ const deleteFile = async (req, res) => {
         $or: [
           { name: fileId },
           { shortUrl: `/f/${fileId}` },
-          { shortUrl: `/g/${fileId}` }
+          { shortUrl: `/g/${fileId}` },
+          { shortUrl: `${process.env.BASE_URL}/f/${fileId}` },
+          { shortUrl: `${process.env.BASE_URL}/g/${fileId}` }
         ]
       });
       if (file) isGuest = true;
@@ -474,41 +479,7 @@ const deleteFile = async (req, res) => {
     }
 
     // 4. Delete the object from AWS S3
-    const s3Key = file.name.startsWith('file-share-app/')
-      ? file.name
-      : `file-share-app/${file.name}`;
-
-    try {
-      const s3Client = new S3Client({
-        region: process.env.AWS_REGION,
-        credentials: {
-          accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
-        }
-      });
-      const deleteCommand = new DeleteObjectCommand({
-        Bucket: process.env.AWS_BUCKET_NAME,
-        Key: s3Key,
-      });
-      await s3Client.send(deleteCommand);
-      console.log(`✅ [S3] Deleted object ${s3Key} from bucket ${process.env.AWS_BUCKET_NAME}`);
-    } catch (s3Err) {
-      console.error('⚠️ [S3] Primary delete failed, attempting fallback:', s3Err.message);
-      try {
-        const s3V2 = new AWS.S3({
-          accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-          region: process.env.AWS_REGION
-        });
-        await s3V2.deleteObject({
-          Bucket: process.env.AWS_BUCKET_NAME,
-          Key: s3Key
-        }).promise();
-        console.log(`✅ [S3-v2] Fallback deleted object ${s3Key}`);
-      } catch (fallbackErr) {
-        console.error('⚠️ [S3-v2] Fallback delete error:', fallbackErr.message);
-      }
-    }
+    await purgeS3Object(file.name);
 
     // 5. Delete from MongoDB
     if (isGuest) {

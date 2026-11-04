@@ -1,3 +1,4 @@
+import { startAutoCleanupJob, purgeS3Object } from "./services/cleanup.service.js";
 import { app } from "./app.js";
 import dotenv from "dotenv"
 import connectDB from "./db/index.js"
@@ -19,6 +20,7 @@ const PORT = process.env.PORT || 5600;
 const startServer = async () => {
   try {
     await connectDB();
+    startAutoCleanupJob(30000); // Purges expired files from S3 and MongoDB every 30s
 
     // Register routes
     app.use("/api/files", fileRoutes);

@@ -30,12 +30,15 @@ const FileShow = () => {
       toast.error("Error deleting file");
     }
   };
-
   const handlePreview = async (file) => {
-    if (file.path && file.path.includes("X-Amz-Signature")) {
-      setPreviewFile(file);
+    if (file.expiresAt && new Date(file.expiresAt) <= new Date()) {
+      toast.error("This file has expired and is no longer accessible.");
+      if (user?._id) {
+        dispatch(getUserFiles(user._id));
+      }
       return;
     }
+
     if (file.shortUrl) {
       try {
         const res = await axiosInstance.get(`/files${file.shortUrl}`);
@@ -49,6 +52,13 @@ const FileShow = () => {
           return;
         }
       } catch (err) {
+        if (err.response?.status === 410 || err.response?.status === 404) {
+          toast.error("This file has expired or was deleted.");
+          if (user?._id) {
+            dispatch(getUserFiles(user._id));
+          }
+          return;
+        }
         console.warn("Could not refresh preview URL:", err);
       }
     }
