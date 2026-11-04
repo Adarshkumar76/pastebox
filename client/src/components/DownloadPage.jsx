@@ -100,7 +100,27 @@ const DownloadPage = () => {
     }
   };
 
-  if (error) return <div className="text-red-500">{error}</div>;
+  if (error) {
+    return (
+      <div className="w-full max-w-lg mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 text-center my-12 border border-red-100 dark:border-red-900/50">
+        <div className="w-16 h-16 mx-auto mb-4 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center text-3xl">
+          🗑️
+        </div>
+        <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">
+          File Not Found or Deleted
+        </h3>
+        <p className="text-gray-600 dark:text-gray-300 mb-6 text-sm sm:text-base leading-relaxed">
+          The link you followed is no longer active. This file has been permanently deleted from storage or has expired.
+        </p>
+        <a
+          href="/"
+          className="inline-block px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm shadow transition"
+        >
+          Return to Home
+        </a>
+      </div>
+    );
+  }
   if (isLoading || !file) return <div className="text-gray-500">Loading...</div>;
 
   return (

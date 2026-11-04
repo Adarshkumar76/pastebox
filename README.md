@@ -1,4 +1,4 @@
-# 📦 PasteBox — Secure, Fast & Smart File Sharing Platform
+# 📦 PasteBox - Secure, Fast & Smart File Sharing Platform
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)]()
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)]()
@@ -88,9 +88,6 @@ Live Demo (Coming Soon) | Powered by MERN + AWS
 
 ![File Share](./client/src/assets/screenshots/share.png)
 
-### 🔍 File Preview Window
-
-![File Preview](./client/src/assets/screenshots/file_preview.png)
 
 ## 📂 Project Structure
 

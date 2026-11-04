@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { getUserFiles } from "../../redux/slice/file/fileThunk";
+import { getUserFiles, deleteFile } from "../../redux/slice/file/fileThunk";
 import { formatDistanceToNowStrict, differenceInDays } from "date-fns";
 import { FaWhatsapp, FaTelegramPlane, FaInstagram, FaEnvelope, FaHeadset,FaDownload } from "react-icons/fa"
 import { toast } from "react-toastify";
@@ -12,6 +12,25 @@ const FileShow = () => {
   const { files } = useSelector((state) => state.file);
   const [previewFile, setPreviewFile] = useState(null);
   const [shareFile, setShareFile] = useState(null);
+  const handleDeleteFile = async (fileId) => {
+    if (!window.confirm("Are you sure you want to permanently delete this file? It will be removed from S3 and the share link will stop working.")) {
+      return;
+    }
+    try {
+      const res = await dispatch(deleteFile(fileId));
+      if (res.error) {
+        toast.error(res.payload?.error || res.payload?.message || "Failed to delete file");
+      } else {
+        toast.success("File permanently deleted from S3 and database!");
+        if (user?._id) {
+          dispatch(getUserFiles(user._id));
+        }
+      }
+    } catch (err) {
+      toast.error("Error deleting file");
+    }
+  };
+
   const handlePreview = async (file) => {
     if (file.path && file.path.includes("X-Amz-Signature")) {
       setPreviewFile(file);

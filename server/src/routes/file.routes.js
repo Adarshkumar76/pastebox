@@ -9,7 +9,9 @@ router.post("/upload", upload.array('files'), uploadFiles);
 router.post("/upload-guest", upload.array('files'), uploadFilesGuest);
 
 router.get("/download/:fileId",downloadFile);
-router.delete("/delete/:fileId",deleteFile);
+router.delete("/delete/:fileId", deleteFile);
+router.delete("/guest/:fileId", deleteFile);
+router.delete("/:fileId", deleteFile);
 router.put("/update/:fileId",updateFileStatus);
 router.get("/getFileDetails/:fileId",getFileDetails);
 router.post('/generateShareShortenLink', generateShareShortenLink);

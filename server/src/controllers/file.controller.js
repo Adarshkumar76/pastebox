@@ -8,7 +8,7 @@ import shortid from "shortid";
 import QRCode from "qrcode";
 import { User } from '../models/user.models.js';
 import path from "path";
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 
@@ -435,41 +435,108 @@ const downloadFile = async (req, res) => {
 
 
 const deleteFile = async (req, res) => {
-     const { fileId } = req.params;
+  const { fileId } = req.params;
 
-     try {
-        const file=await file.findById(fileId);
+  try {
+    // 1. Try finding in File (authenticated users) first
+    let file = await File.findById(fileId).catch(() => null);
+    let isGuest = false;
 
-        if(!file){
-          return res.status(404).json({error:'File not found'});
+    // 2. If not found by ID, try GuestFile
+    if (!file) {
+      file = await GuestFile.findById(fileId).catch(() => null);
+      if (file) isGuest = true;
+    }
+
+    // 3. Fallback: find by name or shortCode
+    if (!file) {
+      file = await File.findOne({
+        $or: [
+          { name: fileId },
+          { shortUrl: `/f/${fileId}` },
+          { shortUrl: `/g/${fileId}` }
+        ]
+      });
+    }
+    if (!file) {
+      file = await GuestFile.findOne({
+        $or: [
+          { name: fileId },
+          { shortUrl: `/f/${fileId}` },
+          { shortUrl: `/g/${fileId}` }
+        ]
+      });
+      if (file) isGuest = true;
+    }
+
+    if (!file) {
+      return res.status(404).json({ error: 'File not found or already deleted' });
+    }
+
+    // 4. Delete the object from AWS S3
+    const s3Key = file.name.startsWith('file-share-app/')
+      ? file.name
+      : `file-share-app/${file.name}`;
+
+    try {
+      const s3Client = new S3Client({
+        region: process.env.AWS_REGION,
+        credentials: {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
         }
-
-        if(file.status==='deleted'){
-          return res.status(400).json({error:'File already deleted'});
-        }
-
-        const s3 =new AWS.S3({
+      });
+      const deleteCommand = new DeleteObjectCommand({
+        Bucket: process.env.AWS_BUCKET_NAME,
+        Key: s3Key,
+      });
+      await s3Client.send(deleteCommand);
+      console.log(`✅ [S3] Deleted object ${s3Key} from bucket ${process.env.AWS_BUCKET_NAME}`);
+    } catch (s3Err) {
+      console.error('⚠️ [S3] Primary delete failed, attempting fallback:', s3Err.message);
+      try {
+        const s3V2 = new AWS.S3({
           accessKeyId: process.env.AWS_ACCESS_KEY_ID,
           secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
           region: process.env.AWS_REGION
-        })
-
-        const params={
+        });
+        await s3V2.deleteObject({
           Bucket: process.env.AWS_BUCKET_NAME,
-          Key: `file-share-app/${file.name}`
+          Key: s3Key
+        }).promise();
+        console.log(`✅ [S3-v2] Fallback deleted object ${s3Key}`);
+      } catch (fallbackErr) {
+        console.error('⚠️ [S3-v2] Fallback delete error:', fallbackErr.message);
+      }
+    }
+
+    // 5. Delete from MongoDB
+    if (isGuest) {
+      await GuestFile.findByIdAndDelete(file._id);
+    } else {
+      await File.findByIdAndDelete(file._id);
+      // Decrement user upload metrics if applicable
+      if (file.createdBy) {
+        const user = await User.findById(file.createdBy);
+        if (user && user.totalUploads > 0) {
+          user.totalUploads = Math.max(0, user.totalUploads - 1);
+          if (file.type && file.type.startsWith('image/') && user.imageCount > 0) {
+            user.imageCount = Math.max(0, user.imageCount - 1);
+          }
+          await user.save();
         }
+      }
+    }
 
-        await s3.deleteObject(params).promise();
-        
-         await File.deleteOne({ _id: fileId });
-
-        return res.status(200).json({message:'File deleted successfully'});
-     }catch(error) {
-        console.error("Delete error:", error);
-        return res.status(500).json({ error: 'Internal Server Error' });
-}
-
-}
+    return res.status(200).json({
+      message: 'File permanently deleted from S3 and database successfully',
+      fileId: file._id
+    });
+  } catch (error) {
+    console.error('Delete error:', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
 
 const updateFileStatus = async (req, res) => {
      const {fileId} = req.params;

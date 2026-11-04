@@ -299,7 +299,7 @@ const GuestFilePreview = ({ guestFiles }) => {
 
                             {/* Delete */}
                             <button
-                              onClick={() => deleteFile(file.id)}
+                              onClick={() => deleteFile(file.id || file._id)}
                               className="flex items-center gap-1 px-3 py-1 text-sm text-red-600 border border-red-500 rounded hover:bg-red-50 transition"
                             >
                               <FaTrashAlt /> Delete
@@ -392,7 +392,7 @@ const GuestFilePreview = ({ guestFiles }) => {
 
                             {/* Delete */}
                             <button
-                              onClick={() => deleteFile(file.id)}
+                              onClick={() => deleteFile(file.id || file._id)}
                               className="flex items-center gap-1 px-3 py-1 text-sm text-red-600 border border-red-500 rounded hover:bg-red-50 transition"
                             >
                               <FaTrashAlt /> Delete
