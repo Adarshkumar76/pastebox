@@ -69,12 +69,17 @@ const uploadFiles = async (req, res) => {
       const fileUrl = s3Result.Location;
       const shortCode = shortid.generate();
 
-      // Safe expiration date parsing
+      // Safe expiration date parsing: supports exact ISO timestamp or numeric hours
       let expiryDateObj = null;
-      if (hasExpiry === 'true') {
-        const parsedHours = Number(expiresAt);
-        const hours = (!isNaN(parsedHours) && parsedHours > 0) ? parsedHours : 240;
-        expiryDateObj = new Date(Date.now() + hours * 3600000);
+      if (hasExpiry === 'true' && expiresAt) {
+        const parsedDate = new Date(expiresAt);
+        if (!isNaN(parsedDate.getTime()) && String(expiresAt).includes('-')) {
+          expiryDateObj = parsedDate;
+        } else {
+          const parsedHours = Number(expiresAt);
+          const hours = (!isNaN(parsedHours) && parsedHours > 0) ? parsedHours : 240;
+          expiryDateObj = new Date(Date.now() + hours * 3600000);
+        }
       } else {
         expiryDateObj = new Date(Date.now() + 10 * 24 * 3600000);
       }
@@ -175,12 +180,17 @@ const uploadFilesGuest = async (req, res) => {
       const shortCode = shortid.generate();
       const username = shortid.generate();
 
-      // Safe expiration date parsing
+      // Safe expiration date parsing: supports exact ISO timestamp or numeric hours
       let expiryDateObj = null;
-      if (hasExpiry === 'true') {
-        const parsedHours = Number(expiresAt);
-        const hours = (!isNaN(parsedHours) && parsedHours > 0) ? parsedHours : 240;
-        expiryDateObj = new Date(Date.now() + hours * 3600000);
+      if (hasExpiry === 'true' && expiresAt) {
+        const parsedDate = new Date(expiresAt);
+        if (!isNaN(parsedDate.getTime()) && String(expiresAt).includes('-')) {
+          expiryDateObj = parsedDate;
+        } else {
+          const parsedHours = Number(expiresAt);
+          const hours = (!isNaN(parsedHours) && parsedHours > 0) ? parsedHours : 240;
+          expiryDateObj = new Date(Date.now() + hours * 3600000);
+        }
       } else {
         expiryDateObj = new Date(Date.now() + 10 * 24 * 3600000);
       }

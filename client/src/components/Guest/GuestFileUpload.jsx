@@ -80,10 +80,8 @@ const GuestFileUpload = ({guestFiles, updateFiles}) => {
     formData.append("hasExpiry", enableExpiry);
 
     if (enableExpiry && expiryDate) {
-      const hours = Math.max(1, Math.ceil(
-        (new Date(expiryDate) - new Date()) / (1000 * 60 * 60)
-      ));
-      formData.append("expiresAt", hours);
+      const parsed = new Date(expiryDate);
+      formData.append("expiresAt", !isNaN(parsed.getTime()) ? parsed.toISOString() : expiryDate);
     }
 
     formData.append("isPassword", enablePassword);
